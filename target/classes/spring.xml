@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:websocket="http://www.springframework.org/schema/websocket"
+	xsi:schemaLocation="http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
+		http://www.springframework.org/schema/websocket http://www.springframework.org/schema/websocket/spring-websocket-4.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd">
+    
+	<context:component-scan base-package="com.quartz.*"/>
+	
+	<!-- quartz的定时任务的factorybean,配置其他config -->
+    <bean id="jobFactory" class="com.quartz.factory.JobFactory"></bean>	
+    <bean id="schedulerFactoryBean" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">  
+       <property name="jobFactory" ref="jobFactory"/>
+       <property name="taskExecutor" ref="executor"/>
+       <property name="dataSource" ref="dataSource" />  
+       <property name="configLocation" value="classpath:properties/quartz.properties" />
+    	<!--可选，QuartzScheduler 启动时更新己存在的Job，这样就不用每次修改targetObject后删除qrtz_job_details表对应记录了 -->
+        <property name="overwriteExistingJobs" value="true" />
+        <!-- 延迟加载20秒,即启动后20秒再执行 -->
+        <property name="startupDelay" value="20"/>
+        <!-- 把spring上下 文以key/value的方式存放在了quartz的上下文中了 -->
+        <property name="applicationContextSchedulerContextKey" value="applicationContext" />
+    </bean>
+    <!-- lazy-init=false 容器初始化时即完成实例化 -->
+    <bean id="quartzManager" class="com.quartz.manager.QuartzManager" lazy-init="false" init-method="startJobs" >  
+        <property name="scheduler" ref="schedulerFactoryBean"/>
+    </bean>  
+    
+    <!-- 线程执行器配置，用于任务注册 -->
+	<bean id="executor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="10" />
+		<property name="maxPoolSize" value="100" />
+		<property name="queueCapacity" value="500" />
+	</bean>
+	
+	<!--1:配置数据库相关参数,property ：${url}-->
+    <context:property-placeholder location="classpath:properties/jdbc.properties"/>
+    <!--2:数据库连接池 -->
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="${jdbc.driver}"/>
+        <property name="jdbcUrl" value="${jdbc.url}"/>
+        <property name="user" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+
+        <!--c3p0连接池私有属性 -->
+        <property name="maxPoolSize" value="30"/>
+        <property name="minPoolSize" value="10"/>
+        <!-- 关闭连接后不自动commit-->
+        <property name="autoCommitOnClose" value="false"/>
+
+        <property name="checkoutTimeout" value="1000"/>
+
+        <property name="acquireRetryAttempts" value="2"/>
+    </bean>
+</beans>
